@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高校生物 早押しクイズ</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f8ff;
+            color: #333;
+        }
+
+        #quiz-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        #start-screen h1 {
+            color: #007bff;
+        }
+
+        #start-screen button,
+        #quiz-screen button.choice-btn,
+        #quiz-screen #next-question-btn,
+        #result-screen button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        #start-screen button:hover,
+        #quiz-screen button.choice-btn:hover:not(:disabled),
+        #quiz-screen #next-question-btn:hover,
+        #result-screen button:hover {
+            background-color: #0056b3;
+        }
+
+        #quiz-screen {
+            display: none; /* 初期状態では非表示 */
+        }
+
+        #timer-container {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+            color: #dc3545;
+        }
+        
+        #progress-bar-container {
+            width: 100%;
+            background-color: #e9ecef;
+            border-radius: .25rem;
+            margin-bottom: 15px;
+            height: 20px;
+        }
+
+        #progress-bar {
+            width: 100%;
+            height: 100%;
+            background-color: #28a745;
+            border-radius: .25rem;
+            transition: width 0.1s linear;
+        }
+
+        #score-container {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #17a2b8;
+        }
+
+        #question-theme {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        #question-text {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            min-height: 50px; /* 問題文の高さ確保 */
+        }
+
+        #choices-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        #quiz-screen button.choice-btn {
+            background-color: #6c757d;
+            width: 100%;
+            min-height: 60px;
+        }
+
+        #quiz-screen button.choice-btn.correct {
+            background-color: #28a745 !important; /* 正解は緑 */
+        }
+        #quiz-screen button.choice-btn.incorrect {
+            background-color: #dc3545 !important; /* 不正解は赤 */
+        }
+        #quiz-screen button.choice-btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+
+        #feedback {
+            margin-top: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            min-height: 30px;
+        }
+        #feedback.correct {
+            color: #28a745;
+        }
+        #feedback.incorrect {
+            color: #dc3545;
+        }
+
+
+        #next-question-btn {
+            margin-top: 20px;
+            background-color: #ffc107;
+            color: #212529;
+        }
+        #next-question-btn:hover {
+            background-color: #e0a800;
+        }
+
+
+        #result-screen {
+            display: none; /* 初期状態では非表示 */
+        }
+        #result-screen h2 {
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+
+<div id="quiz-container">
+    <div id="start-screen">
+        <h1>高校生物 早押しクイズ</h1>
+        <p>挑戦するテーマを選んでください：</p>
+        <button onclick="startQuiz('恒常性')">恒常性 (10問)</button>
+        <button onclick="startQuiz('酵素の働き')">酵素の働き (10問)</button>
+        <button onclick="startQuiz('自然選択説')">自然選択説 (10問)</button>
+    </div>
+
+    <div id="quiz-screen">
+        <div id="timer-container">残り時間: <span id="time-left">15</span>秒</div>
+        <div id="progress-bar-container">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="score-container">スコア: <span id="current-score">0</span></div>
+        <hr>
+        <div id="question-number"></div>
+        <div id="question-theme"></div>
+        <div id="question-text"></div>
+        <div id="choices-container">
+            <button class="choice-btn" id="choice0" onclick="selectAnswer(0)"></button>
+            <button class="choice-btn" id="choice1" onclick="selectAnswer(1)"></button>
+            <button class="choice-btn" id="choice2" onclick="selectAnswer(2)"></button>
+            <button class="choice-btn" id="choice3" onclick="selectAnswer(3)"></button>
+        </div>
+        <div id="feedback"></div>
+        <button id="next-question-btn" onclick="loadNextQuestion()" style="display:none;">次の問題へ</button>
+    </div>
+
+    <div id="result-screen">
+        <h2>クイズ終了！</h2>
+        <p>最終スコア: <span id="final-score">0</span></p>
+        <p>全 <span id="total-questions-result">0</span> 問中 <span id="correct-answers-result">0</span> 問正解</p>
+        <button onclick="restartQuiz()">もう一度挑戦する</button>
+    </div>
+</div>
+
+<script>
+    const allQuizzes = {
+        "恒常性": [
+            { question: "体温調節の中枢はどこか？", choices: ["A. 大脳", "B. 小脳", "C. 間脳視床下部", "D. 延髄"], answer: 2 },
+            { question: "血糖値を上昇させるホルモンはどれか？", choices: ["A. インスリン", "B. グルカゴン", "C. バソプレシン", "D. 成長ホルモン"], answer: 1 },
+            { question: "血液中の水分量を調節し、尿量を減少させるホルモンは何か？", choices: ["A. アドレナリン", "B. チロキシン", "C. バソプレシン", "D. パラトルモン"], answer: 2 },
+            { question: "血糖値が低下した際に、肝臓でグリコーゲンをグルコースに分解するのを促進するホルモンの一つは？", choices: ["A. インスリン", "B. アドレナリン", "C. ソマトスタチン", "D. カルシトニン"], answer: 1 },
+            { question: "免疫において、特定の抗原に対して特異的に反応する細胞はどれか？", choices: ["A. 好中球", "B. マクロファージ", "C. リンパ球", "D. 赤血球"], answer: 2 },
+            { question: "体液のpHを一定に保つ働きを何というか？", choices: ["A. 浸透圧調節", "B. pH緩衝作用", "C. 体温調節", "D. 血糖調節"], answer: 1 },
+            { question: "腎臓の主な機能として誤っているものはどれか？", choices: ["A. 老廃物の排出", "B. 水分・塩類濃度の調節", "C. 赤血球の産生", "D. pHの調節"], answer: 2 },
+            { question: "交感神経が優位になると、心拍数はどうなるか？", choices: ["A. 増加する", "B. 減少する", "C. 変化しない", "D. 不規則になる"], answer: 0 },
+            { question: "副腎皮質から分泌され、血糖値を上昇させる働きを持つホルモン群はどれか？", choices: ["A. 鉱質コルチコイド", "B. 糖質コルチコイド", "C. 性ホルモン", "D. アドレナリン"], answer: 1 },
+            { question: "恒常性の維持において、負のフィードバックとはどのような仕組みか？", choices: ["A. 結果が原因を促進する", "B. 結果が原因を抑制する", "C. 常に一定の出力を保つ", "D. 外部環境の変化に反応しない"], answer: 1 }
+        ],
+        "酵素の働き": [
+            { question: "酵素の主成分は何か？", choices: ["A. 炭水化物", "B. 脂質", "C. タンパク質", "D. 核酸"], answer: 2 },
+            { question: "酵素反応において、酵素と特異的に結合する物質を何というか？", choices: ["A. 生成物", "B. 補酵素", "C. 基質", "D. 阻害剤"], answer: 2 },
+            { question: "酵素反応の速度は、温度が最適温度を超えて上昇するとどうなるか？", choices: ["A. 上昇し続ける", "B. 急激に低下する", "C. 一定に保たれる", "D. わずかに上昇する"], answer: 1 },
+            { question: "ある酵素の最適pHが7であるとき、pH3の条件下では酵素活性はどうなると予想されるか？", choices: ["A. 最大になる", "B. ほとんど失われる", "C. 変化しない", "D. pH7の時よりやや高くなる"], answer: 1 },
+            { question: "基質濃度が十分に高い場合、酵素濃度を2倍にすると反応速度はどうなるか？", choices: ["A. 変化しない", "B. 約2倍になる", "C. 約1/2になる", "D. 約4倍になる"], answer: 1 },
+            { question: "カタラーゼは何を分解する酵素か？", choices: ["A. デンプン", "B. タンパク質", "C. 過酸化水素", "D. 脂肪"], answer: 2 },
+            { question: "酵素は反応の活性化エネルギーをどう変化させるか？", choices: ["A. 高くする", "B. 低くする", "C. 変化させない", "D. 反応によって高くも低くもする"], answer: 1 },
+            { question: "多くの酵素が高温で失活する主な原因は何か？", choices: ["A. 基質不足", "B. 低温", "C. 立体構造の変化（変性）", "D. 補酵素の過剰"], answer: 2 },
+            { question: "酵素の活性部位とは何か？", choices: ["A. 酵素全体", "B. 基質と結合し反応を触媒する部位", "C. 酵素のエネルギー源となる部位", "D. 酵素が細胞内で合成される部位"], answer: 1 },
+            { question: "唾液に含まれるアミラーゼがデンプンを分解すると主に何が生成されるか？", choices: ["A. グルコース", "B. マルトース（麦芽糖）", "C. アミノ酸", "D. 脂肪酸"], answer: 1 }
+        ],
+        "自然選択説": [
+            { question: "自然選択説を提唱した主な人物は誰か？", choices: ["A. メンデル", "B. ラマルク", "C. ダーウィン", "D. ワトソン"], answer: 2 },
+            { question: "自然選択が働く前提として、個体間に見られる差異を何というか？", choices: ["A. 突然変異", "B. 遺伝的浮動", "C. 変異", "D. 適応"], answer: 2 },
+            { question: "「生存競争」において、有利な形質を持つ個体がより多くの子孫を残すことを何というか？", choices: ["A. 用不用説", "B. 獲得形質の遺伝", "C. 適者生存", "D. 種の不変性"], answer: 2 },
+            { question: "キリンの首が長くなった理由をダーウィンの自然選択説で説明するとどうなるか？", choices: ["A. 高い所の葉を食べようと努力し首が伸び、それが遺伝した。", "B. 首の長い個体が生存に有利で子孫を多く残した結果。", "C. 神が首の長いキリンを創造した。", "D. ある日突然、首の長いキリンが突然変異で生まれた。"], answer: 1 },
+            { question: "工業暗化で蛾の体色変化が起きたのは、何による自然選択の例か？", choices: ["A. 捕食者からの逃避", "B. 気候変動への適応", "C. 食物資源の変化", "D. 生殖相手の選択"], answer: 0 },
+            { question: "自然選択説において、進化の遺伝的変化を供給する主なものは何か？", choices: ["A. 学習", "B. 獲得形質", "C. 突然変異", "D. 環境の変化"], answer: 2 },
+            { question: "ある環境下で生存・繁殖に有利な形質を何というか？", choices: ["A. 退化", "B. 適応", "C. 痕跡", "D. 突然変異"], answer: 1 },
+            { question: "自然選択の結果、集団内の遺伝子頻度が変化していく過程を何というか？", choices: ["A. 個体発生", "B. 系統発生（進化）", "C. 遺伝的組換え", "D. 細胞分裂"], answer: 1 },
+            { question: "自然選択が起こるために必要でない条件はどれか？", choices: ["A. 個体間に変異がある", "B. その変異が遺伝する", "C. 個体間で生存率や繁殖率に差がある", "D. 全ての個体が同じだけ子孫を残す"], answer: 3 },
+            { question: "農薬抵抗性を持つ害虫が増えるのは、自然選択のどの側面を反映しているか？", choices: ["A. 人為選択", "B. 方向性選択", "C. 安定化選択", "D. 分断性選択"], answer: 1 }
+        ]
+    };
+
+    let currentQuizData = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let correctAnswersCount = 0;
+    let timeLeft = 15; 
+    let timerInterval;
+    const BASE_POINTS_PER_QUESTION = 100; 
+    const TIME_BONUS_MULTIPLIER = 10; 
+
+    const startScreen = document.getElementById('start-screen');
+    const quizScreen = document.getElementById('quiz-screen');
+    const resultScreen = document.getElementById('result-screen');
+
+    const questionNumberEl = document.getElementById('question-number');
+    const questionThemeEl = document.getElementById('question-theme');
+    const questionTextEl = document.getElementById('question-text');
+    const choiceButtons = [
+        document.getElementById('choice0'),
+        document.getElementById('choice1'),
+        document.getElementById('choice2'),
+        document.getElementById('choice3')
+    ];
+    const feedbackEl = document.getElementById('feedback');
+    const nextQuestionBtn = document.getElementById('next-question-btn');
+    
+    const timeLeftEl = document.getElementById('time-left');
+    const progressBar = document.getElementById('progress-bar');
+    const currentScoreEl = document.getElementById('current-score');
+    
+    const finalScoreEl = document.getElementById('final-score');
+    const totalQuestionsResultEl = document.getElementById('total-questions-result');
+    const correctAnswersResultEl = document.getElementById('correct-answers-result');
+
+    function shuffleArray(array) { 
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    function startQuiz(theme) {
+        currentQuizData = [...allQuizzes[theme]]; 
+        shuffleArray(currentQuizData); 
+        currentQuestionIndex = 0;
+        score = 0;
+        correctAnswersCount = 0;
+        updateScoreDisplay();
+        
+        startScreen.style.display = 'none';
+        resultScreen.style.display = 'none';
+        quizScreen.style.display = 'block';
+        
+        loadNextQuestion();
+    }
+
+    function loadNextQuestion() {
+        if (currentQuestionIndex < currentQuizData.length) {
+            resetQuestionState();
+            const questionData = currentQuizData[currentQuestionIndex];
+            
+            questionNumberEl.textContent = `問題 ${currentQuestionIndex + 1} / ${currentQuizData.length}`;
+            questionThemeEl.textContent = `テーマ: ${getThemeFromQuestion(questionData)}`;
+            questionTextEl.textContent = questionData.question;
+            
+            questionData.choices.forEach((choice, index) => {
+                choiceButtons[index].textContent = choice;
+            });
+            
+            startTimer();
+            currentQuestionIndex++; // ★★★ 修正: 次の問題のためにインデックスをここで増やす ★★★
+        } else {
+            showResults();
+        }
+    }
+    
+    function getThemeFromQuestion(questionData) {
+        for (const theme in allQuizzes) {
+            if (allQuizzes[theme].some(q => q.question === questionData.question)) {
+                return theme;
+            }
+        }
+        return "不明";
+    }
+
+    function resetQuestionState() {
+        feedbackEl.textContent = '';
+        feedbackEl.className = '';
+        nextQuestionBtn.style.display = 'none';
+        choiceButtons.forEach(button => {
+            button.disabled = false;
+            button.className = 'choice-btn';
+        });
+        timeLeft = 15;
+        timeLeftEl.textContent = timeLeft;
+        progressBar.style.width = '100%';
+        progressBar.style.backgroundColor = '#28a745'; 
+    }
+
+    function startTimer() {
+        timeLeft = 15;
+        timeLeftEl.textContent = timeLeft;
+        progressBar.style.transition = 'width 0.1s linear'; 
+        progressBar.style.width = '100%';
+
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timeLeftEl.textContent = timeLeft;
+            progressBar.style.width = (timeLeft / 15) * 100 + '%';
+
+            if (timeLeft <= 5) {
+                progressBar.style.backgroundColor = '#dc3545'; 
+            }
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                feedbackEl.textContent = "時間切れ！";
+                feedbackEl.className = 'incorrect';
+                disableChoices();
+                showCorrectAnswer();
+                nextQuestionBtn.style.display = 'block';
+            }
+        }, 1000);
+    }
+
+    function selectAnswer(selectedIndex) {
+        clearInterval(timerInterval);
+        disableChoices();
+
+        // currentQuestionIndex は loadNextQuestion で既にインクリメントされているので、
+        // 正誤判定には、1つ前のインデックス（現在表示されていた問題のインデックス）を使う必要がある
+        const questionData = currentQuizData[currentQuestionIndex - 1]; // ★★★ 修正: 正しい問題データを参照 ★★★
+        const correctAnswerIndex = questionData.answer;
+
+        if (selectedIndex === correctAnswerIndex) {
+            const pointsEarned = BASE_POINTS_PER_QUESTION + (timeLeft * TIME_BONUS_MULTIPLIER);
+            score += pointsEarned;
+            correctAnswersCount++;
+            feedbackEl.textContent = `正解！ +${pointsEarned}点 (残り${timeLeft}秒ボーナス)`;
+            feedbackEl.className = 'correct';
+            choiceButtons[selectedIndex].classList.add('correct');
+        } else {
+            feedbackEl.textContent = "不正解...";
+            feedbackEl.className = 'incorrect';
+            choiceButtons[selectedIndex].classList.add('incorrect');
+            choiceButtons[correctAnswerIndex].classList.add('correct'); 
+        }
+        updateScoreDisplay();
+        nextQuestionBtn.style.display = 'block';
+    }
+
+    function disableChoices() {
+        choiceButtons.forEach(button => button.disabled = true);
+    }
+    
+    function showCorrectAnswer() {
+        // currentQuestionIndex は loadNextQuestion で既にインクリメントされているので、
+        // 正解表示には、1つ前のインデックス（時間切れになった問題のインデックス）を使う
+        const questionData = currentQuizData[currentQuestionIndex - 1]; // ★★★ 修正: 正しい問題データを参照 ★★★
+        choiceButtons[questionData.answer].classList.add('correct');
+    }
+
+    function updateScoreDisplay() {
+        currentScoreEl.textContent = score;
+    }
+
+    function showResults() {
+        quizScreen.style.display = 'none';
+        resultScreen.style.display = 'block';
+        finalScoreEl.textContent = score;
+        totalQuestionsResultEl.textContent = currentQuizData.length; // 表示する総問題数は quizData の長さ
+        correctAnswersResultEl.textContent = correctAnswersCount;
+    }
+
+    function restartQuiz() {
+        resultScreen.style.display = 'none';
+        startScreen.style.display = 'block';
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        quizScreen.style.display = 'none';
+        resultScreen.style.display = 'none';
+        startScreen.style.display = 'block';
+    });
+</script>
+
+</body>
+</html>
